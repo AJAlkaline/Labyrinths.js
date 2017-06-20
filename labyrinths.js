@@ -13,17 +13,25 @@ canvas.height = window.innerHeight;
 var ctx = canvas.getContext("2d");
 ctx.fillStyle = "#000000";
 ctx.strokeStyle = "#000000";
-ctx.lineWidth = 2;
 
 var mouseX = 0;
 var mouseY = 0;
 //ctx.fillRect(0,0,150,75);
 
+var snakesize = 3;
+var startingsnakes = 100;
+var dieoff = false;
+var dieoffrate = 100;
+var maxsnakes = 9000;
+var topsnakes = 0;
+
+ctx.lineWidth = snakesize;
+
 var grid = new Array();
 
-for(i=0; i<canvas.width; i++) {
+for(i=0; i<canvas.width/snakesize; i++) {
 	grid[i]= new Array();
-	for(j=0; j<canvas.height; j++) {
+	for(j=0; j<canvas.height/snakesize; j++) {
 		grid[i][j] = -1;
 	}
 }
@@ -35,25 +43,32 @@ var gcolorbase = Math.random();
 var bcolorbase = Math.random();
 
 snake = function(id, position) {
+	topsnakes = snakes.length;
 	this.id = id;
 	this.points = [];
 	this.points.push(position);
 	grid[this.points[0].x][this.points[0].y] = this.id;
-	this.deathCount = 5000;
+	this.deathCount = 1000;
 	this.vel = Math.floor(Math.random()*4);
-	this.rcolormod = 0.75 - 1.5*Math.random();
-	this.gcolormod = 0.75 - 1.5*Math.random();
-	this.bcolormod = 0.75 - 1.5*Math.random();
+	this.rcolormod = 1 - 2*Math.random();
+	this.gcolormod = 1 - 2*Math.random();
+	this.bcolormod = 1 - 2*Math.random();
 	this.getColor = function() {
-	 return 'rgb(' + Math.floor(rcolorbase*255 + this.rcolormod*this.points.length/2) + 
-			', ' + Math.floor(gcolorbase*255 + this.gcolormod*this.points.length/2) +
-			', ' + Math.floor(bcolorbase*255 + this.bcolormod*this.points.length/2) + ')';
+	 return 'rgb(' + Math.floor(rcolorbase*255*(snakes.length/topsnakes) + this.rcolormod*123) + 
+			', ' + Math.floor(gcolorbase*255*(snakes.length/topsnakes) + this.gcolormod*123) +
+			', ' + Math.floor(bcolorbase*255*(snakes.length/topsnakes) + this.bcolormod*123) + ')';
 	}
 }
 
+snakeWindow = function() {
+	this.x = 0;
+	this.y = 0;
+}
+
 makeSnakes = function(){
-	for(i=0; i<100; i++) {
-		var tpos = {x:Math.floor(Math.random()*canvas.width), y:Math.floor(Math.random()*canvas.height)};
+	for(i=0; i<startingsnakes; i++) {
+		var tpos = {x:Math.floor(Math.random()*canvas.width/snakesize), 
+			y:Math.floor(Math.random()*canvas.height/snakesize)};
 		if(checkPoint(tpos, -1)) {
 			snakes.push(new snake(snakes.length, tpos));
 		}
@@ -114,7 +129,16 @@ updateSnakes = function() {
 			}*/
 
 			if(checkPoint(cpoint, snakes[i])) {
-				snakes[i].points.push(cpoint);
+				if(snakes[i].points.length < 2 ||
+					(cpoint.x != snakes[i].points[snakes[i].points.length-2].x != 
+					snakes[i].points[snakes[i].points.length-1].x ||
+				   cpoint.y != snakes[i].points[snakes[i].points.length-2].y !=
+				   snakes[i].points[snakes[i].points.length-1].y)) {
+					snakes[i].points.push(cpoint);
+				}
+				else {
+					snakes[i].points[snakes[i].points.length-1] = cpoint;
+				}
 				grid[cpoint.x][cpoint.y] = snakes[i].id;
 				break;
 			}
@@ -123,30 +147,32 @@ updateSnakes = function() {
 			}
 		}
 		/* Branching snakes */
-		if (snakes[i].deathCount > 0 && snakes[i].points.length > 3 && Math.random() < 0.0025
-			&& snakes.length < 2000) {
+		if (snakes[i].deathCount > 0 && snakes[i].points.length > 3 && Math.random() < 0.005
+			&& snakes.length < maxsnakes) {
 			var tpos = snakes[i].points[snakes[i].points.length-1];
 			snakes.push(new snake(snakes[i].id, tpos));
 			snakes[snakes.length-1].points.unshift(snakes[i].points[snakes[i].points.length-2]);
 			snakes[snakes.length-1].points.unshift(snakes[i].points[snakes[i].points.length-3]);
 		}
 		/* Die and have baby */
-		if (snakes[i].deathCount < 1 && snakes[i].deathCount > -2 && snakes.length < 2000) {
-			for(l=0; l<100; l++) {
-				var tpos = {x:Math.floor(Math.random()*canvas.width), y:Math.floor(Math.random()*canvas.height)};
+		if (snakes[i].deathCount < 1 && snakes[i].deathCount > -1 && (!dieoff || snakes.length < maxsnakes)) {
+			for(l=0; l<50; l++) {
+				var tpos = {x:Math.floor(Math.random()*canvas.width/snakesize),
+							 y:Math.floor(Math.random()*canvas.height/snakesize)};
 				if(checkPoint(tpos, -1)) {
 					snakes.push(new snake(snakes.length, tpos));
-					l=100;
+					l=50;
 				}
 			}
 			snakes[i].deathCount--;
 		}
 		/* Hang around for a bit after dead */
-		if (snakes[i].deathCount < 0 && snakes[i].deathCount >= -800) {
+		if (snakes[i].deathCount < 0 && snakes[i].deathCount >= -dieoffrate*snakes[i].points.length*.1) {
 			snakes[i].deathCount--;
 		}
 		/* Start to disappear */
-		if (snakes[i].deathCount < -800 && snakes[i].points.length > 0) {
+		if (dieoff &&
+			snakes[i].deathCount < -dieoffrate*snakes[i].points.length*.1 && snakes[i].points.length > 0) {
 			var rpos = snakes[i].points.shift();
 			grid[rpos.x][rpos.y] = -1;
 		}
@@ -159,7 +185,7 @@ updateSnakes = function() {
 }
 
 checkPoint = function(point, sn) {
-		if(point.x > canvas.width || point.y > canvas.height ||
+		if(point.x > canvas.width/snakesize || point.y > canvas.height/snakesize ||
 			point.x < 0 || point.y < 0) {
 			return false;
 		}
@@ -204,15 +230,20 @@ checkPoint = function(point, sn) {
 
 
 drawSnakes = function() {
-	ctx.clearRect(0,0, canvas.width, canvas.height);
+	if(dieoff) {
+		ctx.clearRect(0,0, canvas.width, canvas.height);
+	}
 	for(i=0; i<snakes.length; i++) {
-		if(snakes[i].points.length > 1) {
+		if(snakes[i].points.length > 0 && (dieoff || snakes[i].deathCount > -1)) {
 			ctx.beginPath();
 			ctx.strokeStyle = snakes[i].getColor();
-			ctx.moveTo(snakes[i].points[0].x*2, snakes[i].points[0].y*2);
+			ctx.moveTo(snakes[i].points[0].x*snakesize, snakes[i].points[0].y*snakesize);
 		
 			for(j=1; j<snakes[i].points.length; j++) {
-				ctx.lineTo(snakes[i].points[j].x*2, snakes[i].points[j].y*2);
+				if(j == snakes[i].points.length-1 || 
+					(snakes[i].points[j-1].x != snakes[i].points[j+1].x &&
+					snakes[i].points[j-1].y != snakes[i].points[j+1].y))
+				ctx.lineTo(snakes[i].points[j].x*snakesize, snakes[i].points[j].y*snakesize);
 			}
 
 			/*ctx.moveTo(snakes[i].points[snakes[i].points.length-2].x*5, 
