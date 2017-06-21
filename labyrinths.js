@@ -110,7 +110,7 @@ var mouseY = canvas.height/2;
 //ctx.fillRect(0,0,150,75);
 
 var snakesize = 3;
-var startingsnakes = 50;
+var startingsnakes = Math.floor(30*(canvas.width/1600));
 var dieoff = false;
 var dieoffrate = 50;
 var maxsnakes = 5000;
@@ -278,7 +278,7 @@ updateSnakes = function() {
 		}
 		/* Die and have baby */
 		if (snakes[i].deathCount < 1 && snakes[i].deathCount > -1 && (!dieoff || snakes.length < maxsnakes)) {
-			for(l=0; l<30; l++) {
+			for(l=0; l<50; l++) {
 				if(!snakewindow.circle) {
 					var tpos = {x:Math.floor(snakewindow.x/snakesize + Math.random()*snakewindow.width/snakesize), 
 					y:Math.floor(snakewindow.y/snakesize + Math.random()*snakewindow.height/snakesize)};
@@ -289,7 +289,7 @@ updateSnakes = function() {
 				}
 				if(checkPoint(tpos, -1)) {
 					snakes.push(new snake(snakes.length, tpos));
-					l=30;
+					l=50;
 				}
 			}
 			snakes[i].deathCount--;
