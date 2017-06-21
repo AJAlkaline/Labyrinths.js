@@ -1,3 +1,92 @@
+
+// Converts a #ffffff hex string into an [r,g,b] array
+var h2r = function(hex) {
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? [
+        parseInt(result[1], 16),
+        parseInt(result[2], 16),
+        parseInt(result[3], 16)
+    ] : null;
+};
+
+// Inverse of the above
+var r2h = function(rgb) {
+    return "#" + ((1 << 24) + (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]).toString(16).slice(1);
+};
+
+// Interpolates two [r,g,b] colors and returns an [r,g,b] of the result
+// Taken from the awesome ROT.js roguelike dev library at
+// https://github.com/ondras/rot.js
+var _interpolateColor = function(color1, color2, factor) {
+  if (arguments.length < 3) { factor = 0.5; }
+  var result = color1.slice();
+  for (var i=0;i<3;i++) {
+    result[i] = Math.round(result[i] + factor*(color2[i]-color1[i]));
+  }
+  return result;
+};
+
+var rgb2hsl = function(color) {
+  var r = color[0]/255;
+  var g = color[1]/255;
+  var b = color[2]/255;
+
+  var max = Math.max(r, g, b), min = Math.min(r, g, b);
+  var h, s, l = (max + min) / 2;
+
+  if (max == min) {
+    h = s = 0; // achromatic
+  } else {
+    var d = max - min;
+    s = (l > 0.5 ? d / (2 - max - min) : d / (max + min));
+    switch(max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+
+  return [h, s, l];
+};
+
+var hsl2rgb = function(color) {
+  var l = color[2];
+
+  if (color[1] == 0) {
+    l = Math.round(l*255);
+    return [l, l, l];
+  } else {
+    function hue2rgb(p, q, t) {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    }
+
+    var s = color[1];
+    var q = (l < 0.5 ? l * (1 + s) : l + s - l * s);
+    var p = 2 * l - q;
+    var r = hue2rgb(p, q, color[0] + 1/3);
+    var g = hue2rgb(p, q, color[0]);
+    var b = hue2rgb(p, q, color[0] - 1/3);
+    return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+  }
+};
+
+var _interpolateHSL = function(color1, color2, factor) {
+  if (arguments.length < 3) { factor = 0.5; }
+  var hsl1 = rgb2hsl(color1);
+  var hsl2 = rgb2hsl(color2);
+  for (var i=0;i<3;i++) {
+    hsl1[i] += factor*(hsl2[i]-hsl1[i]);
+  }
+  return hsl2rgb(hsl1);
+};
+
+
 /* -----------------------------------------------
 /* Author : Vincent Garreau  - vincentgarreau.com
 /* MIT license: http://opensource.org/licenses/MIT
@@ -14,15 +103,15 @@ var ctx = canvas.getContext("2d");
 ctx.fillStyle = "#000000";
 ctx.strokeStyle = "#000000";
 
-var mouseX = 0;
-var mouseY = 0;
+var mouseX = canvas.width/2;
+var mouseY = canvas.height/2;
 //ctx.fillRect(0,0,150,75);
 
 var snakesize = 3;
-var startingsnakes = 100;
-var dieoff = false;
-var dieoffrate = 100;
-var maxsnakes = 9000;
+var startingsnakes = 50;
+var dieoff = true;
+var dieoffrate = 50;
+var maxsnakes = 5000;
 var topsnakes = 0;
 
 ctx.lineWidth = snakesize;
@@ -50,32 +139,63 @@ snake = function(id, position) {
 	grid[this.points[0].x][this.points[0].y] = this.id;
 	this.deathCount = 1000;
 	this.vel = Math.floor(Math.random()*4);
-	this.rcolormod = 1 - 2*Math.random();
-	this.gcolormod = 1 - 2*Math.random();
-	this.bcolormod = 1 - 2*Math.random();
+	//this.rcolormod = 1 - 2*Math.random();
+	//this.gcolormod = 1 - 2*Math.random();
+	//this.bcolormod = 1 - 2*Math.random();
 	this.getColor = function() {
-	 return 'rgb(' + Math.floor(rcolorbase*255*(snakes.length/topsnakes) + this.rcolormod*123) + 
-			', ' + Math.floor(gcolorbase*255*(snakes.length/topsnakes) + this.gcolormod*123) +
-			', ' + Math.floor(bcolorbase*255*(snakes.length/topsnakes) + this.bcolormod*123) + ')';
+	 return 'rgb(' + Math.floor(rcolorbase*255*(this.points[0].x*snakesize/canvas.width)) + 
+			', ' + Math.floor(gcolorbase*255*(this.points[0].y*snakesize/canvas.height)) +
+			', ' + Math.floor(bcolorbase*255*(this.points.length/200)) + ')';
 	}
 }
 
-snakeWindow = function() {
+
+snakeWindow = function(width, height, mousefollow, circle, blurry, keepalive) {
 	this.x = 0;
 	this.y = 0;
+	this.width = width;
+	this.height = height;
+	this.mousefollow = mousefollow;
+	this.circle = circle; // if the window is a circle, it'll treat width as the diameter
+	this.blurry = blurry; // blurry edges makes the window a little less strict
+	this.keepalive = keepalive; // prevents snakes in window from dying
+	this.updateSnakeWindow = function() {
+		if(this.mousefollow) {
+			this.x = Math.floor(mouseX - this.width/2);
+			if(!circle) {
+				this.y = Math.floor(mouseY - this.height/2);
+			}
+			else {
+				this.y = Math.floor(mouseY - this.width/2);
+			}
+		}
+	}
 }
 
-makeSnakes = function(){
-	for(i=0; i<startingsnakes; i++) {
-		var tpos = {x:Math.floor(Math.random()*canvas.width/snakesize), 
-			y:Math.floor(Math.random()*canvas.height/snakesize)};
+var snakewindow = new snakeWindow(Math.floor(canvas.width/3), Math.floor(canvas.height/3), true, true, true, false);
+
+makeSnakes = function(numsnakes){
+	for(i=0; i<numsnakes; i++) {
+		if(!snakewindow.circle) {
+			var tpos = {x:Math.floor(snakewindow.x/snakesize + Math.random()*snakewindow.width/snakesize), 
+			y:Math.floor(snakewindow.y/snakesize + Math.random()*snakewindow.height/snakesize)};
+		}
+		else {
+			var tpos = {x:Math.floor(snakewindow.x/snakesize + Math.random()*snakewindow.width/snakesize), 
+			y:Math.floor(snakewindow.y/snakesize + Math.random()*snakewindow.width/snakesize)};
+		}
 		if(checkPoint(tpos, -1)) {
+			console.log(tpos);
 			snakes.push(new snake(snakes.length, tpos));
 		}
 	}
 }
 
 updateSnakes = function() {
+	if(snakes.length < maxsnakes) {
+		makeSnakes(1);
+	}
+
 	for(i=0; i<snakes.length; i++) {
 		while(snakes[i].deathCount > 0) {
 			var cpoint = {};
@@ -147,7 +267,7 @@ updateSnakes = function() {
 			}
 		}
 		/* Branching snakes */
-		if (snakes[i].deathCount > 0 && snakes[i].points.length > 3 && Math.random() < 0.005
+		if (snakes[i].deathCount > 0 && snakes[i].points.length > 3 && Math.random() < 0.0025
 			&& snakes.length < maxsnakes) {
 			var tpos = snakes[i].points[snakes[i].points.length-1];
 			snakes.push(new snake(snakes[i].id, tpos));
@@ -157,8 +277,14 @@ updateSnakes = function() {
 		/* Die and have baby */
 		if (snakes[i].deathCount < 1 && snakes[i].deathCount > -1 && (!dieoff || snakes.length < maxsnakes)) {
 			for(l=0; l<50; l++) {
-				var tpos = {x:Math.floor(Math.random()*canvas.width/snakesize),
-							 y:Math.floor(Math.random()*canvas.height/snakesize)};
+				if(!snakewindow.circle) {
+					var tpos = {x:Math.floor(snakewindow.x/snakesize + Math.random()*snakewindow.width/snakesize), 
+					y:Math.floor(snakewindow.y/snakesize + Math.random()*snakewindow.height/snakesize)};
+				}
+				else {
+					var tpos = {x:Math.floor(snakewindow.x/snakesize + Math.random()*snakewindow.width/snakesize), 
+					y:Math.floor(snakewindow.y/snakesize + Math.random()*snakewindow.width/snakesize)};
+				}
 				if(checkPoint(tpos, -1)) {
 					snakes.push(new snake(snakes.length, tpos));
 					l=50;
@@ -167,11 +293,13 @@ updateSnakes = function() {
 			snakes[i].deathCount--;
 		}
 		/* Hang around for a bit after dead */
-		if (snakes[i].deathCount < 0 && snakes[i].deathCount >= -dieoffrate*snakes[i].points.length*.1) {
+		if ((!snakewindow.keepalive || !checkPoint(snakes[i].points[snakes[i].points.length-1], snakes[i], true)) && 
+			snakes[i].deathCount < 0 && snakes[i].deathCount >= -dieoffrate*snakes[i].points.length*.1) {
 			snakes[i].deathCount--;
 		}
 		/* Start to disappear */
-		if (dieoff &&
+		if (dieoff && 
+			(!snakewindow.keepalive || !checkPoint(snakes[i].points[snakes[i].points.length-1], snakes[i], true)) && 
 			snakes[i].deathCount < -dieoffrate*snakes[i].points.length*.1 && snakes[i].points.length > 0) {
 			var rpos = snakes[i].points.shift();
 			grid[rpos.x][rpos.y] = -1;
@@ -184,10 +312,22 @@ updateSnakes = function() {
 
 }
 
-checkPoint = function(point, sn) {
-		if(point.x > canvas.width/snakesize || point.y > canvas.height/snakesize ||
-			point.x < 0 || point.y < 0) {
-			return false;
+checkPoint = function(point, sn, keepalive) {
+		if(snakewindow.circle) {
+			if(( Math.pow((point.x - (snakewindow.x+snakewindow.width/2)/snakesize), 2) +
+				Math.pow((point.y - (snakewindow.y+snakewindow.width/2)/snakesize), 2)
+				>= Math.pow(snakewindow.width/2/snakesize, 2)) &&
+				(keepalive || !snakewindow.blurry || Math.random() > 0.25)) {
+				return false;
+			}
+		}
+		else {
+			if(( point.x > (snakewindow.x + snakewindow.width)/snakesize || 
+				point.y > (snakewindow.y + snakewindow.height)/snakesize ||
+				point.x < snakewindow.x/snakesize || point.y < snakewindow.y/snakesize) &&
+				(keepalive || !snakewindow.blurry || Math.random() > 0.25)) {
+				return false;
+			}
 		}
 
 		for(k=-1; k<2; k++) {
@@ -196,9 +336,9 @@ checkPoint = function(point, sn) {
 					grid[0].length-1 < point.y+r || point.y+r < 0) {
 					return false;
 				}
-				else if (grid[point.x+k][point.y+r] &&
+				else if (
 					grid[point.x+k][point.y+r] > -1) {
-					if (sn != -1 && grid[point.x+k][point.y+r] == sn.id) {
+					if (sn.id != -1 && grid[point.x+k][point.y+r] == sn.id) {
 						var lastpoint = sn.points[sn.points.length-1];
 						var slastpoint = sn.points[sn.points.length-2];
 						if((lastpoint.x == point.x+k && lastpoint.y == point.y+r) ||
@@ -258,13 +398,17 @@ drawSnakes = function() {
 newFrame = function() {
 	updateSnakes();
 	drawSnakes();
+	snakewindow.updateSnakeWindow();
 	console.log(snakes.length);
 	window.requestAnimFrame(newFrame);
 }
 
-makeSnakes();
+window.addEventListener('mousemove', function(e){
 
-//setInterval(newFrame, 1000 / 60);
+	mouseX = e.clientX;
+	mouseY = e.clientY;
+
+})
 
 window.requestAnimFrame = (function(){
   return  window.requestAnimationFrame ||
@@ -286,11 +430,8 @@ window.cancelRequestAnimFrame = ( function() {
     clearTimeout
 } )();
 
+snakewindow.updateSnakeWindow();
+makeSnakes(startingsnakes);
+
 window.requestAnimFrame(newFrame);
 
-window.addEventListener('mousemove', function(e){
-
-	mouseX = e.clientX;
-	mouseY = e.clientY;
-
-})
