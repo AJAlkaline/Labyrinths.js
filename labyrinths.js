@@ -278,7 +278,7 @@ updateSnakes = function() {
 		}
 		/* Die and have baby */
 		if (snakes[i].deathCount < 1 && snakes[i].deathCount > -1 && (!dieoff || snakes.length < maxsnakes)) {
-			for(l=0; l<50; l++) {
+			for(l=0; l<30; l++) {
 				if(!snakewindow.circle) {
 					var tpos = {x:Math.floor(snakewindow.x/snakesize + Math.random()*snakewindow.width/snakesize), 
 					y:Math.floor(snakewindow.y/snakesize + Math.random()*snakewindow.height/snakesize)};
@@ -289,7 +289,7 @@ updateSnakes = function() {
 				}
 				if(checkPoint(tpos, -1)) {
 					snakes.push(new snake(snakes.length, tpos));
-					l=50;
+					l=30;
 				}
 			}
 			snakes[i].deathCount--;
@@ -405,23 +405,17 @@ newFrame = function() {
 	window.requestAnimFrame(newFrame);
 }
 
-trackMouse = function(e){
-	mouseX = e.clientX;
-	mouseY = e.clientY;
+trackTouch = function(e){
+	mouseX = e.touches[0].clientX;
+	mouseY = e.touches[0].clientY;
 }
 
 window.addEventListener('mousemove', function(e){
 	mouseX = e.clientX;
 	mouseY = e.clientY;
 });
-window.addEventListener('touchmove', function(e){
-	mouseX = e.touches[0].clientX;
-	mouseY = e.touches[0].clientY;
-	console.log(mouseX);
-	console.log(mouseY);
-});
-
-
+window.addEventListener('touchstart', trackTouch);
+window.addEventListener('touchmove', trackTouch);
 
 window.requestAnimFrame = (function(){
   return  window.requestAnimationFrame ||
