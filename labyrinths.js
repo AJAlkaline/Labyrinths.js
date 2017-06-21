@@ -410,9 +410,16 @@ trackMouse = function(e){
 	mouseY = e.clientY;
 }
 
-window.addEventListener('mousemove', trackMouse);
-window.addEventListener('touchmove', trackMouse)
-window.addEventListener('touchstart', trackMouse);
+window.addEventListener('mousemove', function(e){
+	mouseX = e.clientX;
+	mouseY = e.clientY;
+});
+window.addEventListener('touchmove', function(e){
+	mouseX = e.touches[0].clientX;
+	mouseY = e.touches[0].clientY;
+	console.log(mouseX);
+	console.log(mouseY);
+});
 
 
 
