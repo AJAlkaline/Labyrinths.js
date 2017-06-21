@@ -1,4 +1,6 @@
 
+/* --- vendor --- */
+
 // Converts a #ffffff hex string into an [r,g,b] array
 var h2r = function(hex) {
     var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -88,10 +90,10 @@ var _interpolateHSL = function(color1, color2, factor) {
 
 
 /* -----------------------------------------------
-/* Author : Vincent Garreau  - vincentgarreau.com
+/* Author : Alex Alleavitch
 /* MIT license: http://opensource.org/licenses/MIT
-/* Demo / Generator : vincentgarreau.com/particles.js
-/* GitHub : github.com/VincentGarreau/particles.js
+/* Demo / Generator : alexalleavitch.com/labyrinths.js
+/* GitHub : github.com/AJAlkaline/Labyrinths.js
 /* How to use? : Check the GitHub README
 /* v2.0.0
 /* ----------------------------------------------- */
@@ -109,7 +111,7 @@ var mouseY = canvas.height/2;
 
 var snakesize = 3;
 var startingsnakes = 50;
-var dieoff = true;
+var dieoff = false;
 var dieoffrate = 50;
 var maxsnakes = 5000;
 var topsnakes = 0;
@@ -192,7 +194,7 @@ makeSnakes = function(numsnakes){
 }
 
 updateSnakes = function() {
-	if(snakes.length < maxsnakes) {
+	if(snakes.length < maxsnakes/2) {
 		makeSnakes(1);
 	}
 
@@ -403,12 +405,16 @@ newFrame = function() {
 	window.requestAnimFrame(newFrame);
 }
 
-window.addEventListener('mousemove', function(e){
-
+trackMouse = function(e){
 	mouseX = e.clientX;
 	mouseY = e.clientY;
+}
 
-})
+window.addEventListener('mousemove', trackMouse);
+window.addEventListener('touchmove', trackMouse)
+window.addEventListener('touchstart', trackMouse);
+
+
 
 window.requestAnimFrame = (function(){
   return  window.requestAnimationFrame ||
